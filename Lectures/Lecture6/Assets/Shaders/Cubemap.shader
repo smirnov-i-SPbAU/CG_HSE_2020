@@ -94,14 +94,32 @@
                 float3 normal = normalize(i.normal);
                 
                 float3 viewDirection = normalize(_WorldSpaceCameraPos - i.pos.xyz);
+
+                uint N = 25000;
+                float3 sum = float3(0, 0, 0);
+                float3 normalized_sum = 0;
                 
+                for (uint i = 0; i < 2 * N; i += 2)
+                {
+                    float cos_theta = 2 * Random(i) - 1;
+                    float sin_theta = sqrt(1 - Sqr(cos_theta));
+                    float alpha = 2 * UNITY_PI * Random(i + 1);
+                    float3 w = float3(sin_theta * cos(alpha), sin_theta * sin(alpha), cos_theta);
+                    float cosin = dot(normal, w);
+                    if (cosin >= 0) {
+                        float brdf = GetSpecularBRDF(viewDirection.xyz, w, normal);
+                        normalized_sum += brdf * cosin;
+                        sum += SampleColor(w) * brdf * cosin;
+                    }
+                }
+                sum /= normalized_sum;
                 // Replace this specular calculation by Montecarlo.
                 // Normalize the BRDF in such a way, that integral over a hemysphere of (BRDF * dot(normal, w')) == 1
                 // TIP: use Random(i) to get a pseudo-random value.
-                float3 viewRefl = reflect(-viewDirection.xyz, normal);
-                float3 specular = SampleColor(viewRefl);
+                //float3 viewRefl = reflect(-viewDirection.xyz, normal);
+                //float3 specular = SampleColor(viewRefl);
                 
-                return fixed4(specular, 1);
+                return fixed4(sum, 1);
             }
             ENDCG
         }
