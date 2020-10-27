@@ -95,7 +95,7 @@
                 
                 float3 viewDirection = normalize(_WorldSpaceCameraPos - i.pos.xyz);
 
-                uint N = 25000;
+                uint N = 5000;
                 float3 sum = float3(0, 0, 0);
                 float3 normalized_sum = 0;
                 
