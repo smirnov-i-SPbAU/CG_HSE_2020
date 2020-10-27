@@ -64,7 +64,17 @@ void ComputeHarmonics(uint id : SV_DispatchThreadID)
         float4(0, 0, 0, 0), // SH_2_rgb
     };
 
-    const float SQRT_PI_2_INV = 1.0 / 2 * sqrt(PI);
+    const float const_y00 = 1; // 1/(2*sqrt(PI)) ** 2 * 4PI * PI / PI
+    
+    const float const_y1_1 = 2; // (-sqrt(3)/(2*sqrt(PI))) ** 2 * 4 * PI / PI * 2PI/3 
+    const float const_y10 = 2; // (sqrt(3)/(2*sqrt(PI))) ** 2 * 4 * PI / PI * 2PI/3 
+    const float const_y11 = 2; // (-sqrt(3)/(2*sqrt(PI))) ** 2 * 4 * PI / PI * 2PI/3 
+    
+    const float const_y2_2 = 15 / 4.0; // (sqrt(15)/(2*sqrt(PI)) ** 2 * 4 * PI / PI * PI / 4
+    const float const_y2_1 = 15 / 4.0; // (sqrt(15)/(2*sqrt(PI)) ** 2 * 4 * PI / PI * PI / 4
+    const float const_y20 = 5 / 16.0; // (sqrt(5)/(4*sqrt(PI)) ** 2 * 4 * PI / PI * PI / 4 
+    const float const_y21 = 15 / 4.0; // (sqrt(15)/(2*sqrt(PI)) ** 2 * 4 * PI / PI * PI / 4
+    const float const_y22 = 15 / 16.0; // (sqrt(15)/(4*sqrt(PI)) ** 2 * 4 * PI / PI * PI / 4
 
     for (uint i = SAMPLES * id; i < SAMPLES * (id + 1); ++i)
     {
@@ -72,23 +82,23 @@ void ComputeHarmonics(uint id : SV_DispatchThreadID)
         float sin_theta = sqrt(1 - cos_theta * cos_theta);
         float alpha = 2 * PI * Random(2 * i + 1);
         float3 w = float3(sin_theta * cos(alpha), sin_theta * sin(alpha), cos_theta);
-        float3 color = SampleColor(w);
+        float3 color = SampleColor(w) / SAMPLES;
 
-        float y00 = SQRT_PI_2_INV;
-        float y1_1 = -sqrt(3) * w.y * SQRT_PI_2_INV;
-        float y10 = sqrt(3) * w.z * SQRT_PI_2_INV;
-        float y11 = -sqrt(3) * w.x * SQRT_PI_2_INV;
-        float y2_2 = sqrt(15) * w.y * w.x * SQRT_PI_2_INV;
-        float y2_1 = -sqrt(15) * w.y * w.z * SQRT_PI_2_INV;
-        float y20 = sqrt(5) * (3 * w.z * w.z - 1) * SQRT_PI_2_INV / 2;
-        float y21 = -sqrt(15) * w.x * w.z * SQRT_PI_2_INV;
-        float y22 = sqrt(15) * (w.x * w.x - w.y * w.y) * SQRT_PI_2_INV / 2;
+        float y00 = 1;
+        float y1_1 = w.y;
+        float y10 = w.z;
+        float y11 = w.x;
+        float y2_2 = w.y * w.x;
+        float y2_1 = w.y * w.z;
+        float y20 = 3 * w.z * w.z - 1;
+        float y21 = w.x * w.z;
+        float y22 = w.x * w.x - w.y * w.y;
 
         for (int j = 0; j < 3; ++j)
         {
-            results[j].x += y1_1 * color[j];
-            results[j].y += y10 * color[j];
-            results[j].z += y11 * color[j];
+            results[j].x += y11 * color[j];
+            results[j].y += y1_1 * color[j];
+            results[j].z += y10 * color[j];
             results[j].w += y00 * color[j];
         }
 
@@ -99,13 +109,25 @@ void ComputeHarmonics(uint id : SV_DispatchThreadID)
             results[k + 3].z += y21 * color[k];
             results[k + 3].w += y20 * color[k];
         }
-        results[6] += y22 * float4(color, 0.0);
+        results[6] += float4(y22 * color, 0.0);
     }
 
-    for (int result_id = 0; result_id < 7; ++result_id)
+    for (int j = 0; j < 3; ++j)
     {
-        results[result_id] /= SAMPLES;
+        results[j].x *= const_y11;
+        results[j].y *= const_y1_1;
+        results[j].z *= const_y10;
+        results[j].w *= const_y00;
     }
+    
+    for (int k = 0; k < 3; ++k)
+    {
+        results[k + 3].x *= const_y2_2;
+        results[k + 3].y *= const_y2_1;
+        results[k + 3].z *= const_y21;
+        results[k + 3].w *= const_y20;
+    }
+    results[6] *= const_y22;
     
     // Populate results buffer using monte-carlo method.
     // You can see the Random(i) function. Use it just as with the previous task.
