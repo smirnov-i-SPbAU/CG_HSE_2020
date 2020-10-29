@@ -47,7 +47,7 @@ float3 SampleColor(float3 direction)
 
 [numthreads(1024, 1, 1)]
 void ComputeHarmonics(uint id : SV_DispatchThreadID)
-{
+{ 
     const int THREADS = 1024;
     const int SAMPLES = 100;
     
@@ -64,15 +64,15 @@ void ComputeHarmonics(uint id : SV_DispatchThreadID)
         float4(0, 0, 0, 0), // SH_2_rgb
     };
 
-    const float const_y00 = 1; // 1/(2*sqrt(PI)) ** 2 * 4PI * PI / PI
+    const float const_y00 = 1.0; // 1/(2*sqrt(PI)) ** 2 * 4PI * PI / PI
     
-    const float const_y1_1 = 2; // (-sqrt(3)/(2*sqrt(PI))) ** 2 * 4 * PI / PI * 2PI/3 
-    const float const_y10 = 2; // (sqrt(3)/(2*sqrt(PI))) ** 2 * 4 * PI / PI * 2PI/3 
-    const float const_y11 = 2; // (-sqrt(3)/(2*sqrt(PI))) ** 2 * 4 * PI / PI * 2PI/3 
+    const float const_y1_1 = 2.0; // (-sqrt(3)/(2*sqrt(PI))) ** 2 * 4 * PI / PI * 2PI/3 
+    const float const_y10 = 2.0; // (sqrt(3)/(2*sqrt(PI))) ** 2 * 4 * PI / PI * 2PI/3 
+    const float const_y11 = 2.0; // (-sqrt(3)/(2*sqrt(PI))) ** 2 * 4 * PI / PI * 2PI/3 
     
     const float const_y2_2 = 15 / 4.0; // (sqrt(15)/(2*sqrt(PI)) ** 2 * 4 * PI / PI * PI / 4
     const float const_y2_1 = 15 / 4.0; // (sqrt(15)/(2*sqrt(PI)) ** 2 * 4 * PI / PI * PI / 4
-    const float const_y20 = 5 / 16.0; // (sqrt(5)/(4*sqrt(PI)) ** 2 * 4 * PI / PI * PI / 4 
+    const float const_y20 = 5 / 8.0; // (sqrt(5)/(4*sqrt(PI)) ** 2 * 4 * PI / PI * PI / 4 * 2 (will be divided by 2 on shader)
     const float const_y21 = 15 / 4.0; // (sqrt(15)/(2*sqrt(PI)) ** 2 * 4 * PI / PI * PI / 4
     const float const_y22 = 15 / 16.0; // (sqrt(15)/(4*sqrt(PI)) ** 2 * 4 * PI / PI * PI / 4
 
@@ -82,7 +82,7 @@ void ComputeHarmonics(uint id : SV_DispatchThreadID)
         float sin_theta = sqrt(1 - cos_theta * cos_theta);
         float alpha = 2 * PI * Random(2 * i + 1);
         float3 w = float3(sin_theta * cos(alpha), sin_theta * sin(alpha), cos_theta);
-        float3 color = SampleColor(w) / SAMPLES;
+        float3 color = SampleColor(w);
 
         float y00 = 1;
         float y1_1 = w.y;
@@ -109,7 +109,14 @@ void ComputeHarmonics(uint id : SV_DispatchThreadID)
             results[k + 3].z += y21 * color[k];
             results[k + 3].w += y20 * color[k];
         }
-        results[6] += float4(y22 * color, 0.0);
+        results[6].x += y22 * color[0];
+        results[6].y += y22 * color[1];
+        results[6].z += y22 * color[2];
+    }
+
+    for (int result_id = 0; result_id < 7; ++result_id)
+    {
+        results[result_id] /= SAMPLES;
     }
 
     for (int j = 0; j < 3; ++j)

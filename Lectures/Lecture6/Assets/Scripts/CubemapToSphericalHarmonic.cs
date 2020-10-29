@@ -98,6 +98,7 @@ public class CubemapToSphericalHarmonic : MonoBehaviour
                     foundDifference = true;
                 }
             }
+            Debug.Log($"P{bufferSetup.Name} {(current - correct):F4}");
         }
 
         if (!foundDifference)
