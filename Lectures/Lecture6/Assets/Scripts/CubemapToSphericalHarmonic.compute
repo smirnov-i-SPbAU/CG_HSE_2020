@@ -1,4 +1,4 @@
-﻿﻿// Each #kernel tells which function to compile; you can have many kernels
+﻿// Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel ComputeHarmonics
 
 #define PI            3.14159265359f
