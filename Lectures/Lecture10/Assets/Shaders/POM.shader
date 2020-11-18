@@ -26,6 +26,9 @@
 
     struct v2f {
         float3 worldPos : TEXCOORD0;
+        half3 tspace0 : TEXCOORD1; // tangent.x, bitangent.x, normal.x
+        half3 tspace1 : TEXCOORD2; // tangent.y, bitangent.y, normal.y
+        half3 tspace2 : TEXCOORD3; // tangent.z, bitangent.z, normal.z
         half3 worldSurfaceNormal : TEXCOORD4;
         // texture coordinate for the normal map
         float2 uv : TEXCOORD5;
@@ -46,6 +49,12 @@
         o.worldSurfaceNormal = normal;
         
         // compute bitangent from cross product of normal and tangent and output it
+        half tangentSign = tangent.w * unity_WorldTransformParams.w;
+        half3 wBitangent = cross(wNormal, wTangent) * tangentSign;
+
+        o.tspace0 = half3(wTangent.x, wBitangent.x, wNormal.x);
+        o.tspace1 = half3(wTangent.y, wBitangent.y, wNormal.y);
+        o.tspace2 = half3(wTangent.z, wBitangent.z, wNormal.z);
         
         return o;
     }
@@ -69,13 +78,41 @@
         float2 uv = i.uv;
         
         float3 worldViewDir = normalize(i.worldPos.xyz - _WorldSpaceCameraPos.xyz);
+        float3x3 worldToTangent = transpose(float3x3(i.tspace0, i.tspace1, i.tspace2));
+        float3 tangentViewDir = normalize(mul(worldToTangent, worldViewDir));
 #if MODE_BUMP
         // Change UV according to the Parallax Offset Mapping
-#endif   
+        float height = _MaxHeight - tex2D(_HeightMap, uv).r * _MaxHeight;
+        float2 offset = tangentViewDir.xy / tangentViewDir.z * height;
+        uv += offset;
+#endif
     
         float depthDif = 0;
+        float y;
 #if MODE_POM | MODE_POM_SHADOWS    
         // Change UV according to Parallax Occclusion Mapping
+        float2 curUV = uv;
+        float curHeight = 0;
+        float realHeight = _MaxHeight - tex2D(_HeightMap, curUV).r * _MaxHeight;
+        float stepHeight = abs(tangentViewDir.z) * _StepLength;
+        float2 deltaUV = tangentViewDir.xy * _StepLength;
+        for (int stepsN = 0; stepsN < _MaxStepCount; ++stepsN)
+        {
+            if (curHeight < realHeight)
+            {
+                curHeight += stepHeight;
+                curUV += deltaUV;
+                realHeight = _MaxHeight - tex2D(_HeightMap, curUV).r * _MaxHeight;
+            }    
+        }
+        float ph = curHeight - stepHeight;
+        float2 prevUV = curUV - deltaUV;
+        float phr = _MaxHeight - tex2D(_HeightMap, prevUV).r * _MaxHeight;
+        float h = curHeight;
+        float hr = realHeight;
+        float x = (ph - phr) / (hr - phr - h + ph);
+        if (x > 1 || x < 0) x = 0.5;
+        uv = (1 - x) * curUV + x * prevUV;
 #endif
 
         float3 worldLightDir = normalize(_WorldSpaceLightPos0.xyz);
@@ -87,6 +124,10 @@
         half3 normal = i.worldSurfaceNormal;
 #if !MODE_PLAIN
         // Implement Normal Mapping
+        half3 tnormal = UnpackNormal(tex2D(_NormalMap, uv));
+        normal.x = dot(i.tspace0, tnormal);
+        normal.y = dot(i.tspace1, tnormal);
+        normal.z = dot(i.tspace2, tnormal);
 #endif
 
         // Diffuse lightning
@@ -101,6 +142,7 @@
 
         // Return resulting color
         float3 texColor = tex2D(_MainTex, uv);
+        //outColor = half4(y, y, y, 0);
         outColor = half4((diffuseLight + specularLight + ambient) * texColor, 0);
         outDepth = LinearEyeDepthToOutDepth(LinearEyeDepth(i.clip.z));
     }
